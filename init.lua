@@ -34,6 +34,7 @@ function bows.register_bow(bowname, def)
 		description = def.description .. " (place to reload)",
 		inventory_image = def.image .. "^bows_overlay_empty.png",
 
+		on_use = function() end,
 		on_place = reload_bow,
 		on_secondary_use = reload_bow,
 	})
@@ -70,15 +71,15 @@ bows.register_bow("bows:bow_wood", {
 	image = "bows_bow_wood.png",
 	recipe_item = "group:wood",
 	strength = 40,
-	uses = 200
+	uses = 150
 })
 
 bows.register_bow("bows:bow_mese", {
 	description = "Mese Bow",
 	image = "bows_bow_mese.png",
 	recipe_item = "default:mese_crystal",
-	strength = 80,
-	uses = 600
+	strength = 70,
+	uses = 800
 })
 
 
@@ -103,12 +104,16 @@ minetest.register_entity("bows:e_arrow", {
 	visual_size = {x = 0.2, y = 0.15},
 	old_pos = nil,
 	shooter_name = "",
+	waiting_for_removal = false,
 
 	on_activate = function(self)
 		self.object:set_acceleration({x = 0, y = -9.81, z = 0})
 	end,
 
 	on_step = function(self, dtime)
+		if self.waiting_for_removal then
+			return
+		end
 		local pos = self.object:get_pos()
 		self.old_pos = self.old_pos or pos
 
@@ -118,16 +123,18 @@ minetest.register_entity("bows:e_arrow", {
 			if thing.type == "object" and thing.ref ~= self.object then
 				if not thing.ref:is_player()
 						or thing.ref:get_player_name() ~= self.shooter_name then
-					print("punch")
+
 					thing.ref:punch(self.object, 1.0, {
 						full_punch_interval = 0.5,
 						damage_groups = {fleshy = 8}
 					})
+					self.waiting_for_removal = true
 					self.object:remove()
 					return
 				end
 			elseif thing.type == "node" then
 				minetest.item_drop(ItemStack("bows:arrow"), nil, vector.round(self.old_pos))
+				self.waiting_for_removal = true
 				self.object:remove()
 				return
 			end
