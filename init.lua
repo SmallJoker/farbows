@@ -12,7 +12,6 @@ function bows.spawn_arrow(user, strength)
 	end
 	obj:get_luaentity().shooter_name = user:get_player_name()
 	obj:set_yaw(yaw - 0.5 * math.pi)
-	obj:set_acceleration({x = 0, y = -9.81, z = 0})
 	obj:set_velocity(vector.multiply(dir, strength))
 	return true
 end
@@ -96,14 +95,18 @@ minetest.register_craft({
 })
 
 minetest.register_entity("bows:e_arrow", {
-	hp_max = 5,       -- possible to catch the arrow (pro skills)
+	hp_max = 4,       -- possible to catch the arrow (pro skills)
 	physical = false, -- use Raycast
 	collisionbox = {-0.1, -0.1, -0.1, 0.1, 0.1, 0.1},
 	visual = "wielditem",
 	textures = {"bows:arrow"},
-	visual_size = {x = 0.4, y = 0.4},
+	visual_size = {x = 0.2, y = 0.15},
 	old_pos = nil,
 	shooter_name = "",
+
+	on_activate = function(self)
+		self.object:set_acceleration({x = 0, y = -9.81, z = 0})
+	end,
 
 	on_step = function(self, dtime)
 		local pos = self.object:get_pos()
