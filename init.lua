@@ -1,40 +1,6 @@
-function reload_bow(itemstack, user)
-	local inv = user:get_inventory()
-	if not inv:remove_item("main", "bows:arrow"):is_empty() then
-		itemstack:set_name("bows:bow_wood_charged")
-		return itemstack
-	end
-end
+bows = {}
 
-minetest.register_tool("bows:bow_wood", {
-	description = "Wooden Bow (place to reload)",
-	inventory_image = "bows_bow_wood.png^bows_overlay_empty.png",
-
-	on_place = reload_bow,
-	on_secondary_use = reload_bow,
-})
-
-minetest.register_tool("bows:bow_wood_charged", {
-	description = "Wooden Bow (use to fire)",
-	inventory_image = "bows_bow_wood.png^bows_overlay_charged.png",
-	groups = {not_in_creative_inventory=1},
-
-	on_use = function(itemstack, user, pointed_thing)
-		if not spawn_arrow(user, 100) then
-			return -- something failed
-		end
-		itemstack:set_name("bows:bow_wood")
-		itemstack:set_wear(itemstack:get_wear() + 0x10000 / 200)
-		return itemstack
-	end,
-})
-
-minetest.register_craftitem("bows:arrow", {
-	description = "Arrow",
-	inventory_image = "bows_arrow.png",
-})
-
-function spawn_arrow(user, strength)
+function bows.spawn_arrow(user, strength)
 	local pos = user:get_pos()
 	pos.y = pos.y + 1.5 -- camera offset
 	local dir = user:get_look_dir()
@@ -45,11 +11,89 @@ function spawn_arrow(user, strength)
 		return
 	end
 	obj:get_luaentity().shooter_name = user:get_player_name()
-	obj:set_yaw(yaw + 0.5 * math.pi)
+	obj:set_yaw(yaw - 0.5 * math.pi)
 	obj:set_acceleration({x = 0, y = -9.81, z = 0})
 	obj:set_velocity(vector.multiply(dir, strength))
 	return true
 end
+
+function bows.register_bow(bowname, def)
+	assert(type(def.description) == "string")
+	assert(type(def.image) == "string")
+	assert(type(def.strength) == "number")
+	assert(def.uses > 0)
+
+	local function reload_bow(itemstack, user)
+		local inv = user:get_inventory()
+		if not inv:remove_item("main", "bows:arrow"):is_empty() then
+			itemstack:set_name(bowname .. "_charged")
+			return itemstack
+		end
+	end
+
+	minetest.register_tool(bowname, {
+		description = def.description .. " (place to reload)",
+		inventory_image = def.image .. "^bows_overlay_empty.png",
+
+		on_place = reload_bow,
+		on_secondary_use = reload_bow,
+	})
+
+	if def.recipe_item then
+		minetest.register_craft({
+			output = bowname,
+			recipe = {
+				{"", def.recipe_item, "farming:string"},
+				{def.recipe_item, "", "farming:string"},
+				{"", def.recipe_item, "farming:string"},
+			}
+		})
+	end
+
+	minetest.register_tool(bowname .. "_charged", {
+		description = def.description .. " (use to fire)",
+		inventory_image = def.image .. "^bows_overlay_charged.png",
+		groups = {not_in_creative_inventory=1},
+
+		on_use = function(itemstack, user, pointed_thing)
+			if not bows.spawn_arrow(user, def.strength) then
+				return -- something failed
+			end
+			itemstack:set_name(bowname)
+			itemstack:set_wear(itemstack:get_wear() + 0x10000 / def.uses)
+			return itemstack
+		end,
+	})
+end
+
+bows.register_bow("bows:bow_wood", {
+	description = "Wooden Bow",
+	image = "bows_bow_wood.png",
+	recipe_item = "group:wood",
+	strength = 40,
+	uses = 200
+})
+
+bows.register_bow("bows:bow_mese", {
+	description = "Mese Bow",
+	image = "bows_bow_mese.png",
+	recipe_item = "default:mese_crystal",
+	strength = 80,
+	uses = 600
+})
+
+
+minetest.register_craftitem("bows:arrow", {
+	description = "Arrow",
+	inventory_image = "bows_arrow.png",
+})
+
+minetest.register_craft({
+	output = "bows:arrow 5",
+	recipe = {
+		{"default:steel_ingot", "default:stick", "default:stick"},
+	}
+})
 
 minetest.register_entity("bows:e_arrow", {
 	hp_max = 5,       -- possible to catch the arrow (pro skills)
@@ -60,9 +104,8 @@ minetest.register_entity("bows:e_arrow", {
 	visual_size = {x = 0.4, y = 0.4},
 	old_pos = nil,
 	shooter_name = "",
-	
+
 	on_step = function(self, dtime)
-		print("tick tock" .. self.shooter_name)
 		local pos = self.object:get_pos()
 		self.old_pos = self.old_pos or pos
 
@@ -81,7 +124,6 @@ minetest.register_entity("bows:e_arrow", {
 					return
 				end
 			elseif thing.type == "node" then
-				print("drop")
 				minetest.item_drop(ItemStack("bows:arrow"), nil, vector.round(self.old_pos))
 				self.object:remove()
 				return
