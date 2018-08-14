@@ -1,5 +1,5 @@
- Minetest mod: bows
-====================
+ Minetest mod: farbows
+=======================
 Just like all the other bow mods but this time with Raycast.
 Not compatible with any other bow mod.
 

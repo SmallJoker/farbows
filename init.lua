@@ -1,12 +1,18 @@
-bows = {}
 
-function bows.spawn_arrow(user, strength)
+if not minetest.raycast then
+	error("[farbows] This mod requires at least Minetest 5.0.0-dev")
+end
+
+
+farbows = {}
+
+function farbows.spawn_arrow(user, strength)
 	local pos = user:get_pos()
 	pos.y = pos.y + 1.5 -- camera offset
 	local dir = user:get_look_dir()
 	local yaw = user:get_look_horizontal()
 
-	local obj = minetest.add_entity(pos, "bows:e_arrow")
+	local obj = minetest.add_entity(pos, "farbows:e_arrow")
 	if not obj then
 		return
 	end
@@ -16,7 +22,7 @@ function bows.spawn_arrow(user, strength)
 	return true
 end
 
-function bows.register_bow(bowname, def)
+function farbows.register_bow(bowname, def)
 	assert(type(def.description) == "string")
 	assert(type(def.image) == "string")
 	assert(type(def.strength) == "number")
@@ -24,7 +30,7 @@ function bows.register_bow(bowname, def)
 
 	local function reload_bow(itemstack, user)
 		local inv = user:get_inventory()
-		if not inv:remove_item("main", "bows:arrow"):is_empty() then
+		if not inv:remove_item("main", "farbows:arrow"):is_empty() then
 			itemstack:set_name(bowname .. "_charged")
 			return itemstack
 		end
@@ -32,7 +38,7 @@ function bows.register_bow(bowname, def)
 
 	minetest.register_tool(bowname, {
 		description = def.description .. " (place to reload)",
-		inventory_image = def.image .. "^bows_overlay_empty.png",
+		inventory_image = def.image .. "^farbows_overlay_empty.png",
 
 		on_use = function() end,
 		on_place = reload_bow,
@@ -52,11 +58,11 @@ function bows.register_bow(bowname, def)
 
 	minetest.register_tool(bowname .. "_charged", {
 		description = def.description .. " (use to fire)",
-		inventory_image = def.image .. "^bows_overlay_charged.png",
+		inventory_image = def.image .. "^farbows_overlay_charged.png",
 		groups = {not_in_creative_inventory=1},
 
 		on_use = function(itemstack, user, pointed_thing)
-			if not bows.spawn_arrow(user, def.strength) then
+			if not farbows.spawn_arrow(user, def.strength) then
 				return -- something failed
 			end
 			itemstack:set_name(bowname)
@@ -66,41 +72,40 @@ function bows.register_bow(bowname, def)
 	})
 end
 
-bows.register_bow("bows:bow_wood", {
+farbows.register_bow("farbows:bow_wood", {
 	description = "Wooden Bow",
-	image = "bows_bow_wood.png",
+	image = "farbows_bow_wood.png",
 	recipe_item = "group:wood",
-	strength = 40,
+	strength = 30,
 	uses = 150
 })
 
-bows.register_bow("bows:bow_mese", {
+farbows.register_bow("farbows:bow_mese", {
 	description = "Mese Bow",
-	image = "bows_bow_mese.png",
+	image = "farbows_bow_mese.png",
 	recipe_item = "default:mese_crystal",
-	strength = 70,
+	strength = 60,
 	uses = 800
 })
 
-
-minetest.register_craftitem("bows:arrow", {
+minetest.register_craftitem("farbows:arrow", {
 	description = "Arrow",
-	inventory_image = "bows_arrow.png",
+	inventory_image = "farbows_arrow.png",
 })
 
 minetest.register_craft({
-	output = "bows:arrow 5",
+	output = "farbows:arrow 5",
 	recipe = {
 		{"default:steel_ingot", "default:stick", "default:stick"},
 	}
 })
 
-minetest.register_entity("bows:e_arrow", {
+minetest.register_entity("farbows:e_arrow", {
 	hp_max = 4,       -- possible to catch the arrow (pro skills)
 	physical = false, -- use Raycast
 	collisionbox = {-0.1, -0.1, -0.1, 0.1, 0.1, 0.1},
 	visual = "wielditem",
-	textures = {"bows:arrow"},
+	textures = {"farbows:arrow"},
 	visual_size = {x = 0.2, y = 0.15},
 	old_pos = nil,
 	shooter_name = "",
@@ -112,6 +117,7 @@ minetest.register_entity("bows:e_arrow", {
 
 	on_step = function(self, dtime)
 		if self.waiting_for_removal then
+			self.object:remove()
 			return
 		end
 		local pos = self.object:get_pos()
@@ -133,10 +139,14 @@ minetest.register_entity("bows:e_arrow", {
 					return
 				end
 			elseif thing.type == "node" then
-				minetest.item_drop(ItemStack("bows:arrow"), nil, vector.round(self.old_pos))
-				self.waiting_for_removal = true
-				self.object:remove()
-				return
+				local name = minetest.get_node(thing.under).name
+				if minetest.registered_items[name].walkable then
+					minetest.item_drop(ItemStack("farbows:arrow"),
+						nil, vector.round(self.old_pos))
+					self.waiting_for_removal = true
+					self.object:remove()
+					return
+				end
 			end
 			thing = cast:next()
 		end
